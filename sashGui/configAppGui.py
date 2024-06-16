@@ -1,59 +1,7 @@
 import tkinter as tk
-from tkinter import simpledialog, messagebox
+from tkinter import messagebox
 import threading
-
-# Mock Serial Class for Testing
-class MockSerial:
-    def __init__(self):
-        self.in_waiting = 0
-        self.buffer = ""
-        self.responses = {
-            "CONFIG:WIFI": "CONFIG:WAITING-WIFI",
-            "CONFIG:SSID:MockSSID": "CONFIG:SUCCESS-WIFI",
-            "CONFIG:PSW:MockPassword": "CONFIG:SUCCESS-WIFI",
-            "CONFIG:USE-LAST": "CONFIG:SUCCESS-WIFI",
-            "CONFIG:COLOR": "CONFIG:WAITING-BLACK",
-            "CONFIG:ALIGNED-black": "CONFIG:WAITING-GREY",
-            "CONFIG:ALIGNED-grey": "CONFIG:WAITING-WHITE",
-            "CONFIG:ALIGNED-white": "CONFIG:WAITING-0",
-            "CONFIG:WAITING-0": "CONFIG:SET-FULLY CLOSE",
-            "CONFIG:WAITING-100": "CONFIG:SET-FULLY OPEN",
-            "CONFIG:SET-fully close": "CONFIG:SET-FULLY CLOSE",
-            "CONFIG:SET-fully open": "CONFIG:SET-FULLY OPEN",
-            "CONFIG:SEE-DIST": "CONFIG:DIST-50",
-            "CONFIG:STOP-DIST": "CONFIG:STOP"
-        }
-        self.set_count = 0
-        self.mocked_ssid = "MockSSID"
-        self.mocked_password = "MockPassword"
-
-    def write(self, data):
-        cmd = data.decode('utf-8').strip()
-        print(f"Sent: {cmd}")
-        if cmd in self.responses:
-            response = self.responses[cmd]
-        else:
-            response = "CONFIG:ERR:Unknown Command"
-
-        self.buffer = response
-        self.in_waiting = len(response)
-
-    def readline(self):
-        response = self.buffer
-        self.buffer = ""
-        self.in_waiting = 0
-        print(f"Received: {response}")
-        return response.encode('utf-8')
-
-
-# Use the MockSerial class for testing
-USE_MOCK_SERIAL = True
-
-if USE_MOCK_SERIAL:
-    Serial = MockSerial
-else:
-    import serial
-    Serial = serial.Serial
+import serial
 
 
 class ESP32ConfigApp:
@@ -61,9 +9,12 @@ class ESP32ConfigApp:
         self.master = master
         master.title("ESP32 Config")
 
-        self.serial_port = Serial()
-        if not USE_MOCK_SERIAL:
-            self.serial_port = Serial('/dev/tty.usbserial-XXXX', 115200, timeout=1)  # Change to the correct port
+        try:
+            self.serial_port = serial.Serial('/dev/tty.usbserial-XXXX', 115200, timeout=1)  # Change to the correct port, i think this is the structure for macbook ports
+        except serial.SerialException as e:
+            messagebox.showerror("Serial Error", str(e))
+            master.destroy()
+            return
 
         self.serial_thread = threading.Thread(target=self.read_serial)
         self.serial_thread.daemon = True
@@ -91,11 +42,15 @@ class ESP32ConfigApp:
         self.submit_button = tk.Button(master, text="Submit", command=self.submit_config)
         self.submit_button.pack()
 
-        self.start_distance_button = tk.Button(master, text="Start Distance Readings", command=self.start_distance_readings)
+        self.start_distance_button = tk.Button(master, text="Start Distance Readings",
+                                               command=self.start_distance_readings)
         self.start_distance_button.pack()
 
-        self.stop_distance_button = tk.Button(master, text="Stop Distance Readings", command=self.stop_distance_readings)
+        self.stop_distance_button = tk.Button(master, text="Stop Distance Readings",
+                                              command=self.stop_distance_readings)
         self.stop_distance_button.pack()
+
+        master.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def log(self, message):
         self.log_text.config(state='normal')
@@ -142,12 +97,8 @@ class ESP32ConfigApp:
         # Handle other cases as needed
 
     def prompt_wifi_credentials(self):
-        if USE_MOCK_SERIAL:
-            ssid = self.serial_port.mocked_ssid
-            password = self.serial_port.mocked_password
-        else:
-            ssid = self.ssid_entry.get()
-            password = self.password_entry.get()
+        ssid = self.ssid_entry.get()
+        password = self.password_entry.get()
 
         if ssid and password:
             self.serial_port.write(f"CONFIG:SSID:{ssid}\n".encode('utf-8'))
@@ -162,7 +113,8 @@ class ESP32ConfigApp:
         self.serial_port.write("CONFIG:COLOR\n".encode('utf-8'))
 
     def prompt_align_sensor(self, color):
-        response = messagebox.askyesno("Align Sensor", f"Align the sensor with the top of the {color} square and press Yes")
+        response = messagebox.askyesno("Align Sensor",
+                                       f"Align the sensor with the top of the {color} square and press Yes")
         if response:
             self.serial_port.write(f"CONFIG:ALIGNED-{color}\n".encode('utf-8'))
 
@@ -172,7 +124,7 @@ class ESP32ConfigApp:
     def prompt_fume_hood(self, action):
         response = messagebox.askyesno("Fume Hood", f"Please {action} the fume hood and press Yes")
         if response:
-            self.serial_port.write(f"CONFIG:SET-{action}\n".encode('utf-8'))
+            self.serial_port.write(f"CONFIG:SET-{action.replace(' ', '-')}\n".encode('utf-8'))
 
     def show_error(self, error_message):
         messagebox.showerror("Error", error_message)
@@ -190,6 +142,11 @@ class ESP32ConfigApp:
 
     def stop_distance_readings(self):
         self.serial_port.write("CONFIG:STOP-DIST\n".encode('utf-8'))
+
+    def on_closing(self):
+        if self.serial_port.is_open:
+            self.serial_port.close()
+        self.master.destroy()
 
 
 if __name__ == "__main__":
