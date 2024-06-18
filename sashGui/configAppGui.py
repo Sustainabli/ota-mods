@@ -10,7 +10,7 @@ class ESP32ConfigApp:
         master.title("ESP32 Config")
 
         try:
-            self.serial_port = serial.Serial('/dev/tty.usbserial-XXXX', 115200, timeout=1)  # Change to the correct port, i think this is the structure for macbook ports
+            self.serial_port = serial.Serial('/dev/tty.usbserial-XXXX', 115200, timeout=1)  # Change to the correct port, e.g., '/dev/ttyUSB0' for Linux
         except serial.SerialException as e:
             messagebox.showerror("Serial Error", str(e))
             master.destroy()
@@ -84,11 +84,11 @@ class ESP32ConfigApp:
             self.serial_port.write("CONFIG:WAITING-0\n".encode('utf-8'))
         elif data.startswith("CONFIG:WAITING-0"):
             self.prompt_fume_hood("fully close")
-        elif data.startswith("CONFIG:SET-FULLY CLOSE"):
+        elif data.startswith("CONFIG:SET-FULLY-CLOSE"):
             self.serial_port.write("CONFIG:WAITING-100\n".encode('utf-8'))
         elif data.startswith("CONFIG:WAITING-100"):
             self.prompt_fume_hood("fully open")
-        elif data.startswith("CONFIG:SET-FULLY OPEN"):
+        elif data.startswith("CONFIG:SET-FULLY-OPEN"):
             self.serial_port.write("CONFIG:SEE-DIST\n".encode('utf-8'))
         elif data.startswith("CONFIG:ERR"):
             self.show_error(data)
