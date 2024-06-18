@@ -10,7 +10,7 @@ class ESP32ConfigApp:
         master.title("ESP32 Config")
 
         try:
-            self.serial_port = serial.Serial('/dev/tty.usbserial-XXXX', 115200, timeout=1)  # Change to the correct port, e.g., '/dev/ttyUSB0' for Linux
+            self.serial_port = serial.Serial('/dev/tty.usbserial-XXXX', 115200, timeout=1)  # Change to the correct port
         except serial.SerialException as e:
             messagebox.showerror("Serial Error", str(e))
             master.destroy()
