@@ -153,3 +153,7 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = ESP32ConfigApp(root)
     root.mainloop()
+
+
+#i wrote this in a very seqeuential manner, so you might need to change some things around to make it work with your code, it starts with asking for ssid and wifi password, then it asks for the color alignment, then the fume hood, and then it starts the distance readings
+#i hope this works, i couldnt test it because i dont have the sensors or wifi, so i just mocked everything in the testing branch
