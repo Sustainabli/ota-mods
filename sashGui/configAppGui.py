@@ -3,14 +3,32 @@ from tkinter import messagebox
 import threading
 import queue
 import time
-from unittest.mock import Mock
+
 
 class ESP32ConfigApp:
-    def __init__(self, master, serial_port):
+    def __init__(self, master):
         self.master = master
         master.title("ESP32 Config")
 
-        self.serial_port = serial_port
+        self.mock_data_queue = queue.Queue()
+        self.mock_data_list = [
+            "CONFIG:WAITING-WIFI",
+            "CONFIG:SUCCESS-WIFI",
+            "CONFIG:WAITING-BLACK",
+            "CONFIG:GOT-BLACK",
+            "CONFIG:WAITING-GREY",
+            "CONFIG:GOT-GREY",
+            "CONFIG:WAITING-WHITE",
+            "CONFIG:GOT-WHITE",
+            "CONFIG:WAITING-0",
+            "CONFIG:SET-FULLY-CLOSE",
+            "CONFIG:WAITING-100",
+            "CONFIG:SET-FULLY-OPEN",
+            "CONFIG:DIST"
+        ]
+
+        for data in self.mock_data_list:
+            self.mock_data_queue.put(data)
 
         self.label = tk.Label(master, text="ESP32 Configuration")
         self.label.pack()
@@ -55,11 +73,11 @@ class ESP32ConfigApp:
         self.log_text.config(state='disabled')
 
     def read_serial(self):
-        while True:
-            if self.serial_port.in_waiting > 0:
-                line = self.serial_port.readline().decode('utf-8').strip()
-                self.log(line)
-                self.process_serial_data(line)
+        while not self.mock_data_queue.empty():
+            line = self.mock_data_queue.get()
+            self.log(line)
+            self.process_serial_data(line)
+            time.sleep(1)  # Simulate delay
 
     def process_serial_data(self, data):
         if data.startswith("CONFIG:WAITING-WIFI"):
@@ -77,15 +95,15 @@ class ESP32ConfigApp:
         elif data.startswith("CONFIG:WAITING-WHITE"):
             self.prompt_align_sensor("white")
         elif data.startswith("CONFIG:GOT-WHITE"):
-            self.serial_port.write("CONFIG:WAITING-0\n".encode('utf-8'))
+            self.mock_data_queue.put("CONFIG:WAITING-0")
         elif data.startswith("CONFIG:WAITING-0"):
             self.prompt_fume_hood("fully close")
         elif data.startswith("CONFIG:SET-FULLY-CLOSE"):
-            self.serial_port.write("CONFIG:WAITING-100\n".encode('utf-8'))
+            self.mock_data_queue.put("CONFIG:WAITING-100")
         elif data.startswith("CONFIG:WAITING-100"):
             self.prompt_fume_hood("fully open")
         elif data.startswith("CONFIG:SET-FULLY-OPEN"):
-            self.serial_port.write("CONFIG:SEE-DIST\n".encode('utf-8'))
+            self.mock_data_queue.put("CONFIG:SEE-DIST")
         elif data.startswith("CONFIG:ERR"):
             self.show_error(data)
         elif data.startswith("CONFIG:DIST"):
@@ -97,36 +115,36 @@ class ESP32ConfigApp:
         password = self.password_entry.get()
 
         if ssid and password:
-            self.serial_port.write(f"CONFIG:SSID:{ssid}\n".encode('utf-8'))
-            self.serial_port.write(f"CONFIG:PSW:{password}\n".encode('utf-8'))
+            self.log(f"CONFIG:SSID:{ssid}")
+            self.log(f"CONFIG:PSW:{password}")
         else:
             messagebox.showwarning("Input Error", "Please enter both SSID and Password")
 
     def use_last_config(self):
-        self.serial_port.write("CONFIG:USE-LAST\n".encode('utf-8'))
+        self.log("CONFIG:USE-LAST")
 
     def request_color_alignment(self, color):
-        self.serial_port.write("CONFIG:COLOR\n".encode('utf-8'))
+        self.log(f"CONFIG:COLOR")
 
     def prompt_align_sensor(self, color):
         response = messagebox.askyesno("Align Sensor",
                                        f"Align the sensor with the top of the {color} square and press Yes")
         if response:
-            self.serial_port.write(f"CONFIG:ALIGNED-{color}\n".encode('utf-8'))
+            self.log(f"CONFIG:ALIGNED-{color}")
 
     def request_distance_config(self):
-        self.serial_port.write("CONFIG:DIST\n".encode('utf-8'))
+        self.log("CONFIG:DIST")
 
     def prompt_fume_hood(self, action):
         response = messagebox.askyesno("Fume Hood", f"Please {action} the fume hood and press Yes")
         if response:
-            self.serial_port.write(f"CONFIG:SET-{action.replace(' ', '-')}\n".encode('utf-8'))
+            self.log(f"CONFIG:SET-{action.replace(' ', '-')}")
 
     def show_error(self, error_message):
         messagebox.showerror("Error", error_message)
 
     def submit_config(self):
-        self.serial_port.write("CONFIG:WIFI\n".encode('utf-8'))
+        self.log("CONFIG:WIFI")
         self.ssid_label.pack_forget()
         self.ssid_entry.pack_forget()
         self.password_label.pack_forget()
@@ -134,10 +152,10 @@ class ESP32ConfigApp:
         self.submit_button.pack_forget()
 
     def start_distance_readings(self):
-        self.serial_port.write("CONFIG:SEE-DIST\n".encode('utf-8'))
+        self.log("CONFIG:SEE-DIST")
 
     def stop_distance_readings(self):
-        self.serial_port.write("CONFIG:STOP-DIST\n".encode('utf-8'))
+        self.log("CONFIG:STOP-DIST")
 
     def on_closing(self):
         self.master.destroy()
@@ -145,7 +163,5 @@ class ESP32ConfigApp:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    mock_serial = Mock()
-    mock_serial.in_waiting = 0
-    app = ESP32ConfigApp(root, mock_serial)
+    app = ESP32ConfigApp(root)
     root.mainloop()
